@@ -201,9 +201,28 @@ export default function ClassCreationWizard({ onSuccess, onCancel }: ClassCreati
       );
 
       // 3. Cria matrículas na turma (class_enrollments)
+      //
+      // student_id é NOT NULL no schema — se o upsert de `students` não
+      // retornou a linha esperada para alguma matrícula (nome/matrícula
+      // com formatação inesperada, falha parcial do upsert), inserir
+      // com student_id ausente faria o Postgres rejeitar o insert inteiro
+      // sem indicar qual aluno é o problema. Filtramos e avisamos aqui,
+      // em vez de deixar isso estourar como um erro genérico do banco.
+      const semIdEncontrado = activeStudents.filter(
+        (s) => !studentIdByMatricula.get(s.matricula)
+      );
+      if (semIdEncontrado.length > 0) {
+        throw new Error(
+          `Não foi possível localizar o cadastro de ${semIdEncontrado.length} aluno(s) após salvar (ex: matrícula ${semIdEncontrado[0].matricula}). Nenhuma matrícula foi criada — verifique os dados e tente novamente.`
+        );
+      }
+
+      // subturma_id é enviado explicitamente como null: a divisão em
+      // subturmas acontece depois do cadastro, na tela dedicada
+      // (ClassStudents.tsx) — nenhum aluno começa com subturma atribuída.
       const enrollmentsPayload = activeStudents.map((s) => ({
         class_id: classRow.id,
-        student_id: studentIdByMatricula.get(s.matricula),
+        student_id: studentIdByMatricula.get(s.matricula) as string,
         subturma_id: null,
       }));
 

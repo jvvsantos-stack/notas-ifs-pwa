@@ -43,7 +43,7 @@ export default function Dashboard({
   const { status: syncStatus, pendingCount } = useSyncManager();
   const [filter, setFilter] = useState<ArchiveFilter>('ativas');
   const [editingClass, setEditingClass] = useState<ClassRow | null>(null);
-  const [deletingClass, setDeletingClass] = useState<ClassRow | null>(null);
+  const [deletingClass, setDeletingClass] = useState<ClassWithStats | null>(null);
 
   const loadClasses = useCallback(async () => {
     setLoading(true);
@@ -266,6 +266,7 @@ export default function Dashboard({
       {deletingClass && (
         <DeleteClassModal
           classData={deletingClass}
+          totalAlunos={deletingClass.totalAlunos}
           onClose={() => setDeletingClass(null)}
           onDeleted={loadClasses}
         />
@@ -345,6 +346,7 @@ function ClassCard({
           {classData.tem_laboratorio ? 'Com lab' : 'Sem lab'}
         </Badge>
         {classData.archived && <Badge tone="amber">Arquivada</Badge>}
+        {classData.totalAlunos === 0 && <Badge tone="amber">Sem alunos</Badge>}
       </div>
 
       <div className="mt-3">
