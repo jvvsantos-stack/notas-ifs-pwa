@@ -43,7 +43,7 @@ No **SQL Editor** do painel do Supabase, execute, nesta ordem, o conteúdo de:
 
 ### 5. Configurar autenticação no painel do Supabase
 Em **Authentication → Providers → Email**:
-- Mantenha a confirmação de e-mail conforme sua necessidade — como agora os professores usam e-mails reais, você pode ativar `Confirm email` se quiser exigir verificação antes do primeiro login (opcional).
+- **Recomendado: deixe `Confirm email` desativado.** Com a confirmação ativada, `signUp` cria o usuário mas não gera sessão até o e-mail ser confirmado — nesse caso a UI mostra uma mensagem pedindo para checar o e-mail e volta para a aba "Entrar", em vez de navegar direto para o Dashboard. Se você tiver um domínio de e-mail configurado e quiser exigir confirmação mesmo assim, o app já trata esse fluxo (`signUp` retorna `requiresEmailConfirmation: true` quando não há sessão).
 - Deixe o comprimento mínimo de senha em **6 caracteres** (o padrão do Supabase) — a senha do app é numérica de 6 dígitos, então não é necessário alterar nada aqui.
 
 ### 6. Rodar em desenvolvimento
@@ -72,6 +72,8 @@ Se quiser trocar o design no futuro, o gerador está em `public/icons/` — rege
 Cada professor cria uma conta com **nome completo, e-mail e uma senha numérica de 6 dígitos**. O e-mail e a senha digitados vão direto para o Supabase Auth (`supabase.auth.signUp` / `signInWithPassword`), sem nenhuma composição sintética — o Supabase cuida do hash da senha (bcrypt), rate-limiting contra força bruta, emissão de JWT e refresh automático de sessão. A tela de auth (`AuthScreen.tsx`) tem abas "Entrar" e "Criar Conta"; a sessão persiste em `localStorage` (via `persistSession: true`, configurado em `supabaseClient.ts`), então o professor continua logado ao fechar e reabrir o app.
 
 O nome completo digitado no cadastro vai em `options.data.nome` do `signUp` (metadado do usuário no Supabase Auth) e é copiado automaticamente para a tabela `profiles` por um trigger de banco (`handle_new_user`, ver `04_auth_profiles_and_ownership.sql`) assim que a conta é criada.
+
+**Login automático após o cadastro:** quando `signUp` retorna uma sessão (ou seja, `Confirm email` está desativado no painel), o `useAuth` detecta essa sessão via `onAuthStateChange` e o `App.tsx` navega para o Dashboard automaticamente — não é preciso digitar as credenciais de novo na aba "Entrar". Como o trigger `handle_new_user` cria a linha em `profiles` de forma assíncrona (um instante depois do `INSERT` em `auth.users`), `useAuth` tenta buscar o perfil algumas vezes com espera curta entre tentativas (até 5x, começando em 300ms) antes de desistir — isso evita que a tela pareça "travada" na aba de login logo após um cadastro bem-sucedido, só porque o perfil ainda não tinha sido criado no exato instante da primeira busca.
 
 Cada turma criada é automaticamente vinculada ao professor autenticado (`classes.professor_id`), e o RLS (Row Level Security) do banco garante — no nível do banco, não só na UI — que cada professor só enxerga suas próprias turmas, matrículas e notas. Alunos (`students`) continuam compartilhados entre professores por matrícula, já que um mesmo aluno pode estar em turmas de professores diferentes.
 

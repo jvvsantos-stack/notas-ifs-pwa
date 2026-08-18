@@ -14,11 +14,15 @@ export default function AuthScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const senhaValida = /^\d{6}$/.test(senha);
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-  const resetFeedback = () => setError(null);
+  const resetFeedback = () => {
+    setError(null);
+    setInfo(null);
+  };
 
   const handleSubmit = async () => {
     resetFeedback();
@@ -46,12 +50,20 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       if (mode === 'criar') {
-        await signUp(nome.trim(), email.trim(), senha);
+        const result = await signUp(nome.trim(), email.trim(), senha);
+        if (result.requiresEmailConfirmation) {
+          setInfo(
+            'Conta criada! Confira seu e-mail para confirmar o cadastro antes de entrar.'
+          );
+          setMode('entrar');
+        }
+        // Se não precisar de confirmação, a sessão já foi criada pelo
+        // signUp — o useAuth detecta isso via onAuthStateChange e o
+        // App.tsx navega para o Dashboard automaticamente, sem exigir
+        // login manual.
       } else {
         await signIn(email.trim(), senha);
       }
-      // Sucesso: o useAuth detecta a sessão automaticamente via
-      // onAuthStateChange, não é necessário navegar manualmente aqui.
     } catch (err: any) {
       setError(traduzErro(err?.message));
     } finally {
@@ -137,6 +149,12 @@ export default function AuthScreen() {
                 A senha deve conter exatamente 6 números, para um acesso rápido e seguro. Use algo
                 fácil de lembrar, mas que só você saiba.
               </p>
+            )}
+
+            {info && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                {info}
+              </div>
             )}
 
             {error && (
