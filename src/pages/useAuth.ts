@@ -13,6 +13,19 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Perfil temporario montado a partir dos dados da sessao (auth.users),
+// usado quando a linha correspondente em `profiles` ainda nao existe
+// ou nao pode ser lida. Garante que uma sessao valida sempre resulte em
+// um perfil utilizavel pela UI, mesmo que incompleto - nunca em `null`.
+function buildFallbackProfile(userId: string, email: string | null | undefined): ProfileRow {
+  return {
+    id: userId,
+    nome: email ?? 'Professor',
+    siape: null,
+    created_at: new Date().toISOString(),
+  };
+}
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>({ loading: true, profile: null });
 
@@ -20,10 +33,11 @@ export function useAuth() {
   // handle_new_user (migration 04) cria a linha em profiles de forma
   // assincrona, um instante depois do INSERT em auth.users - entao,
   // logo apos um signUp, e possivel que a sessao ja exista mas a linha
-  // em profiles ainda nao tenha sido criada. Sem esse retry, a UI
-  // ficaria presa em "sem perfil" mesmo com uma sessao valida, e pareceria
-  // que o login nao funcionou.
-  const loadProfile = useCallback(async (userId: string, attempt = 0) => {
+  // em profiles ainda nao tenha sido criada. O retry cobre essa janela;
+  // se mesmo assim a busca continuar falhando, cai num perfil de
+  // fallback (nome = e-mail) em vez de tratar a sessao como invalida -
+  // "sem perfil encontrado" nunca deve virar "usuario deslogado".
+  const loadProfile = useCallback(async (userId: string, email: string | null | undefined, attempt = 0) => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -33,10 +47,10 @@ export function useAuth() {
     if (error || !data) {
       if (attempt < 5) {
         await wait(300 * (attempt + 1));
-        return loadProfile(userId, attempt + 1);
+        return loadProfile(userId, email, attempt + 1);
       }
-      console.error('Erro ao carregar perfil (apos tentativas):', error);
-      setState({ loading: false, profile: null });
+      console.error('Perfil nao encontrado apos tentativas, usando fallback:', error);
+      setState({ loading: false, profile: buildFallbackProfile(userId, email) });
       return;
     }
 
@@ -46,7 +60,7 @@ export function useAuth() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        loadProfile(session.user.id);
+        loadProfile(session.user.id, session.user.email);
       } else {
         setState({ loading: false, profile: null });
       }
@@ -57,7 +71,7 @@ export function useAuth() {
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         setState((prev) => ({ ...prev, loading: true }));
-        loadProfile(session.user.id);
+        loadProfile(session.user.id, session.user.email);
       } else {
         setState({ loading: false, profile: null });
       }

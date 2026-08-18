@@ -231,7 +231,7 @@ export default function Dashboard({
         )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleClasses.map((c) => (
+          {visibleClasses?.map((c) => (
             <ClassCard
               key={c.id}
               classData={c}
