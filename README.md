@@ -42,8 +42,8 @@ No **SQL Editor** do painel do Supabase, execute, nesta ordem, o conteúdo de:
 
 ### 5. Configurar autenticação no painel do Supabase
 Em **Authentication → Providers → Email**:
-- Deixe a confirmação de e-mail **desativada** (`Confirm email` = off). Os professores usam um e-mail sintético gerado internamente (`{siape}@ifs.local`), que não existe de verdade e não pode receber e-mails de confirmação.
-- O campo de comprimento mínimo de senha do Supabase **não pode ser reduzido abaixo de 6 caracteres** — isso é uma limitação da plataforma, não do app (veja [Sobre o PIN de 4 dígitos](#sobre-o-pin-de-4-dígitos) abaixo para entender como isso foi contornado). Deixe o mínimo padrão (6) ou superior.
+- Deixe a confirmação de e-mail **desativada** (`Confirm email` = off). Os professores usam um e-mail sintético gerado internamente (`{siape}@ifs.edu.br`), que não recebe e-mails de verdade.
+- O campo de comprimento mínimo de senha do Supabase **não pode ser reduzido abaixo de 6 caracteres** — isso é uma limitação da plataforma, não do app (veja [Sobre o e-mail sintético e o PIN de 4 dígitos](#sobre-o-e-mail-sintético-e-o-pin-de-4-dígitos) abaixo para entender como isso foi contornado). Deixe o mínimo padrão (6) ou superior.
 
 ### 6. Rodar em desenvolvimento
 ```bash
@@ -72,11 +72,16 @@ Cada professor cria uma conta com **nome completo, matrícula SIAPE e um PIN de 
 
 Cada turma criada é automaticamente vinculada ao professor autenticado (`classes.professor_id`), e o RLS (Row Level Security) do banco garante — no nível do banco, não só na UI — que cada professor só enxerga suas próprias turmas, matrículas e notas. Alunos (`students`) continuam compartilhados entre professores por matrícula, já que um mesmo aluno pode estar em turmas de professores diferentes.
 
-### Sobre o PIN de 4 dígitos
+### Sobre o e-mail sintético e o PIN de 4 dígitos
 
-O Supabase Auth exige senhas com **no mínimo 6 caracteres** — esse limite é fixo na plataforma e não pode ser reduzido para 4, mesmo configurando o painel manualmente. Como o PIN de 4 dígitos era um requisito explícito (rapidez de digitação para uso em sala de aula), a solução foi: **a senha real enviada ao Supabase Auth é composta como `${siape}-${pin}`** (ex: SIAPE `1234567` + PIN `4821` vira a senha `"1234567-4821"`), montada de forma determinística no frontend (`useAuth.ts`, função `buildPassword`). O professor nunca vê nem digita essa string composta — apenas o PIN de 4 dígitos, exatamente como pedido. No login, a mesma composição é refeita a partir do SIAPE e do PIN digitados, então funciona de forma transparente.
+A composição de credenciais fica em `src/services/auth.ts`, com duas funções puras usadas tanto no cadastro quanto no login (garantindo que o mesmo e-mail e a mesma senha sejam recompostos nos dois fluxos):
 
-Isso não reduz a segurança percebida pelo usuário (o PIN continua sendo o único segredo que ele guarda), mas tecnicamente contorna uma restrição da plataforma sem inventar um sistema de autenticação próprio por fora do Supabase Auth.
+- **`formatSiapeToEmail(siape)`** — o Supabase Auth valida o formato do e-mail e rejeita domínios sem um TLD reconhecido (por exemplo, `@ifs.local` é recusado com "Email address is invalid"). Por isso o e-mail sintético usa `@ifs.edu.br` — um TLD válido e, por coincidência proposital, o domínio real dos Institutos Federais brasileiros — mesmo sem receber e-mails de verdade.
+- **`formatPinToPassword(siape, pin)`** — o Supabase Auth exige senhas com **no mínimo 6 caracteres**, limite fixo da plataforma que não pode ser reduzido para 4. Como o PIN de 4 dígitos era um requisito explícito (rapidez de digitação para uso em sala de aula), a senha real enviada ao Supabase é composta como `${siape}-${pin}` (ex: SIAPE `1234567` + PIN `4821` viram a senha `"1234567-4821"`). Usar o SIAPE inteiro na composição — não só um prefixo fixo — também evita que dois professores com o mesmo PIN acabem com senhas efetivas idênticas.
+
+O professor nunca vê nem digita o e-mail ou a senha compostos — apenas SIAPE e PIN de 4 dígitos, exatamente como pedido.
+
+Isso não reduz a segurança percebida pelo usuário (o PIN continua sendo o único segredo que ele guarda), mas tecnicamente contorna duas restrições da plataforma sem inventar um sistema de autenticação próprio por fora do Supabase Auth.
 
 ## Gerenciamento de turmas
 
@@ -135,6 +140,8 @@ src/
     useInstallPrompt.ts       # captura do evento beforeinstallprompt
     useAuth.ts                # sessão, login, cadastro (SIAPE + PIN)
     supabaseClient.ts
+  services/
+    auth.ts                    # composição do e-mail sintético e da senha a partir do PIN
   types/
     database.ts               # tipos espelhando o schema SQL
 supabase/
