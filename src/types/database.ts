@@ -23,7 +23,8 @@ export interface ClassRow {
 export interface ProfileRow {
   id: string;
   nome: string;
-  siape: string;
+  /** Não coletado no cadastro atual (e-mail + senha) — mantido para uso administrativo futuro. */
+  siape: string | null;
   created_at: string;
 }
 

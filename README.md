@@ -39,11 +39,12 @@ No **SQL Editor** do painel do Supabase, execute, nesta ordem, o conteúdo de:
 3. `supabase/migrations/03_add_archived_to_classes.sql` — **idem, só necessário em bancos já existentes** sem a coluna `archived` (usada para arquivar turmas). Em uma instalação nova, `01` já cria essa coluna.
 4. `supabase/migrations/04_auth_profiles_and_ownership.sql` — **sempre necessário**, mesmo em instalação nova. Cria a tabela `profiles`, o trigger que a popula automaticamente a partir do cadastro (`auth.users`), e substitui as policies permissivas de `01` pelas policies reais baseadas em `auth.uid()`.
 5. `supabase/migrations/05_subturmas.sql` — **só necessário se você já tinha rodado uma versão anterior de `01_initial_schema.sql`** (antes do modelo de subturmas nomeadas). Em uma instalação nova, `01` já cria a tabela `subturmas` e a coluna `subturma_id`.
+6. `supabase/migrations/06_profiles_siape_optional.sql` — **só necessário se você já tinha rodado uma versão anterior de `04_auth_profiles_and_ownership.sql`** (de quando o cadastro ainda coletava SIAPE como campo obrigatório e único). Em uma instalação nova, `04` já cria a coluna `siape` como opcional.
 
 ### 5. Configurar autenticação no painel do Supabase
 Em **Authentication → Providers → Email**:
-- Deixe a confirmação de e-mail **desativada** (`Confirm email` = off). Os professores usam um e-mail sintético gerado internamente (`{siape}@ifs.edu.br`), que não recebe e-mails de verdade.
-- O campo de comprimento mínimo de senha do Supabase **não pode ser reduzido abaixo de 6 caracteres** — isso é uma limitação da plataforma, não do app (veja [Sobre o e-mail sintético e o PIN de 4 dígitos](#sobre-o-e-mail-sintético-e-o-pin-de-4-dígitos) abaixo para entender como isso foi contornado). Deixe o mínimo padrão (6) ou superior.
+- Mantenha a confirmação de e-mail conforme sua necessidade — como agora os professores usam e-mails reais, você pode ativar `Confirm email` se quiser exigir verificação antes do primeiro login (opcional).
+- Deixe o comprimento mínimo de senha em **6 caracteres** (o padrão do Supabase) — a senha do app é numérica de 6 dígitos, então não é necessário alterar nada aqui.
 
 ### 6. Rodar em desenvolvimento
 ```bash
@@ -66,22 +67,13 @@ Os arquivos em `public/icons/*.png` e `public/favicon.svg` contêm o ícone ofic
 
 Se quiser trocar o design no futuro, o gerador está em `public/icons/` — regenere os 4 PNGs mantendo os mesmos nomes de arquivo (`icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`) e o `manifest.json`/`vite.config.ts` continuam funcionando sem alteração.
 
-## Autenticação (SIAPE + PIN de 4 dígitos)
+## Autenticação (e-mail + senha de 6 dígitos)
 
-Cada professor cria uma conta com **nome completo, matrícula SIAPE e um PIN de 4 dígitos numéricos**. A sessão usa o Supabase Auth real (não uma tabela customizada de senhas) — o Supabase cuida do hash da senha (bcrypt), rate-limiting contra força bruta, emissão de JWT e refresh automático de sessão. A tela de auth (`AuthScreen.tsx`) tem abas "Entrar" e "Criar Conta"; a sessão persiste em `localStorage` (via `persistSession: true`, configurado em `supabaseClient.ts`), então o professor continua logado ao fechar e reabrir o app.
+Cada professor cria uma conta com **nome completo, e-mail e uma senha numérica de 6 dígitos**. O e-mail e a senha digitados vão direto para o Supabase Auth (`supabase.auth.signUp` / `signInWithPassword`), sem nenhuma composição sintética — o Supabase cuida do hash da senha (bcrypt), rate-limiting contra força bruta, emissão de JWT e refresh automático de sessão. A tela de auth (`AuthScreen.tsx`) tem abas "Entrar" e "Criar Conta"; a sessão persiste em `localStorage` (via `persistSession: true`, configurado em `supabaseClient.ts`), então o professor continua logado ao fechar e reabrir o app.
+
+O nome completo digitado no cadastro vai em `options.data.nome` do `signUp` (metadado do usuário no Supabase Auth) e é copiado automaticamente para a tabela `profiles` por um trigger de banco (`handle_new_user`, ver `04_auth_profiles_and_ownership.sql`) assim que a conta é criada.
 
 Cada turma criada é automaticamente vinculada ao professor autenticado (`classes.professor_id`), e o RLS (Row Level Security) do banco garante — no nível do banco, não só na UI — que cada professor só enxerga suas próprias turmas, matrículas e notas. Alunos (`students`) continuam compartilhados entre professores por matrícula, já que um mesmo aluno pode estar em turmas de professores diferentes.
-
-### Sobre o e-mail sintético e o PIN de 4 dígitos
-
-A composição de credenciais fica em `src/services/auth.ts`, com duas funções puras usadas tanto no cadastro quanto no login (garantindo que o mesmo e-mail e a mesma senha sejam recompostos nos dois fluxos):
-
-- **`formatSiapeToEmail(siape)`** — o Supabase Auth valida o formato do e-mail e rejeita domínios sem um TLD reconhecido (por exemplo, `@ifs.local` é recusado com "Email address is invalid"). Por isso o e-mail sintético usa `@ifs.edu.br` — um TLD válido e, por coincidência proposital, o domínio real dos Institutos Federais brasileiros — mesmo sem receber e-mails de verdade.
-- **`formatPinToPassword(siape, pin)`** — o Supabase Auth exige senhas com **no mínimo 6 caracteres**, limite fixo da plataforma que não pode ser reduzido para 4. Como o PIN de 4 dígitos era um requisito explícito (rapidez de digitação para uso em sala de aula), a senha real enviada ao Supabase é composta como `${siape}-${pin}` (ex: SIAPE `1234567` + PIN `4821` viram a senha `"1234567-4821"`). Usar o SIAPE inteiro na composição — não só um prefixo fixo — também evita que dois professores com o mesmo PIN acabem com senhas efetivas idênticas.
-
-O professor nunca vê nem digita o e-mail ou a senha compostos — apenas SIAPE e PIN de 4 dígitos, exatamente como pedido.
-
-Isso não reduz a segurança percebida pelo usuário (o PIN continua sendo o único segredo que ele guarda), mas tecnicamente contorna duas restrições da plataforma sem inventar um sistema de autenticação próprio por fora do Supabase Auth.
 
 ## Gerenciamento de turmas
 
@@ -124,9 +116,9 @@ src/
     Modal.tsx                 # dialog overlay genérico, base dos modais acima
     ExportModal.tsx           # exportação CSV/PDF
     SyncStatusBadge.tsx       # indicador online/offline/syncing
-    ProfileMenu.tsx           # menu de perfil do professor (nome/SIAPE + logout)
+    ProfileMenu.tsx           # menu de perfil do professor (nome/e-mail + logout)
   pages/
-    AuthScreen.tsx            # login e criação de conta (SIAPE + PIN)
+    AuthScreen.tsx            # login e criação de conta (e-mail + senha de 6 dígitos)
     Dashboard.tsx             # listagem de turmas
     ClassGrades.tsx           # grid de lançamento de notas
     ClassStudents.tsx         # gestão de alunos e divisão de subturmas
@@ -138,10 +130,8 @@ src/
     useGradeAutosave.ts       # autosave por célula (debounce 800ms)
     useSpreadsheetNavigation.ts # navegação por teclado tipo planilha
     useInstallPrompt.ts       # captura do evento beforeinstallprompt
-    useAuth.ts                # sessão, login, cadastro (SIAPE + PIN)
+    useAuth.ts                # sessão, login, cadastro (e-mail + senha)
     supabaseClient.ts
-  services/
-    auth.ts                    # composição do e-mail sintético e da senha a partir do PIN
   types/
     database.ts               # tipos espelhando o schema SQL
 supabase/
@@ -151,6 +141,7 @@ supabase/
     03_add_archived_to_classes.sql
     04_auth_profiles_and_ownership.sql
     05_subturmas.sql
+    06_profiles_siape_optional.sql
 ```
 
 ## Deploy (Vercel ou Netlify)

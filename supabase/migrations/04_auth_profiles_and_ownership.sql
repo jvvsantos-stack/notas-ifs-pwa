@@ -2,17 +2,14 @@
 -- 04_auth_profiles_and_ownership.sql
 --
 -- Introduz autenticação real (Supabase Auth) com perfis de professor
--- (SIAPE + PIN de 4 dígitos) e isola as turmas por professor via
--- Row Level Security baseada em auth.uid().
+-- e isola as turmas por professor via Row Level Security baseada em
+-- auth.uid().
 --
--- IMPORTANTE sobre o PIN: o Supabase Auth exige senha com no mínimo
--- 6 caracteres (limite hard-coded da plataforma, não configurável
--- abaixo disso — ver README). Por isso, embora a UI mostre e valide
--- apenas 4 dígitos numéricos, a "senha" enviada ao supabase.auth é
--- composta como `${siape}-${pin}` (ex: "12345678-4821"), montada de
--- forma determinística no frontend a partir do SIAPE + PIN digitados.
--- O professor nunca vê nem digita essa string composta — apenas o
--- PIN de 4 dígitos, como pedido.
+-- Autenticação: e-mail real + senha de 6 dígitos numéricos, enviados
+-- diretamente ao Supabase Auth (sem composição sintética de nenhum
+-- tipo). O campo `siape` é opcional — não é mais coletado no fluxo de
+-- cadastro, mas a coluna permanece disponível para uso administrativo
+-- futuro, se necessário.
 -- ============================================================
 
 -- ============================================================
@@ -21,14 +18,15 @@
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   nome text not null,
-  siape text not null unique,
+  siape text,
   created_at timestamptz not null default now()
 );
 
--- Nota: o PIN em si NUNCA é armazenado em `profiles` — ele vive apenas
--- como parte da senha do Supabase Auth (auth.users.encrypted_password,
--- já hasheada com bcrypt pelo próprio Supabase). Isso evita duplicar
--- uma credencial sensível em texto legível em uma tabela própria.
+-- Único apenas quando preenchido (índice parcial) — o cadastro atual
+-- não coleta SIAPE, então múltiplos perfis com siape NULL são normais.
+create unique index profiles_siape_unique_when_present
+  on public.profiles (siape)
+  where siape is not null and siape <> '';
 
 alter table public.profiles enable row level security;
 
@@ -43,8 +41,8 @@ create policy "profiles_update_own" on public.profiles
 
 -- ============================================================
 -- 2. Trigger: cria a linha em `profiles` automaticamente após o
---    cadastro em auth.users, usando os metadados enviados no signUp
---    (nome e siape, passados via `options.data` no client).
+--    cadastro em auth.users, usando o nome completo enviado no
+--    signUp (via `options.data.nome` no client).
 -- ============================================================
 create or replace function public.handle_new_user()
 returns trigger
@@ -56,7 +54,7 @@ begin
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'nome', ''),
-    coalesce(new.raw_user_meta_data->>'siape', '')
+    nullif(new.raw_user_meta_data->>'siape', '')
   );
   return new;
 end;

@@ -8,27 +8,27 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>('entrar');
 
   const [nome, setNome] = useState('');
-  const [siape, setSiape] = useState('');
-  const [pin, setPin] = useState('');
-  const [pinConfirm, setPinConfirm] = useState('');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [senhaConfirm, setSenhaConfirm] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pinValido = /^\d{4}$/.test(pin);
-  const siapeValido = siape.trim().length > 0;
+  const senhaValida = /^\d{6}$/.test(senha);
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const resetFeedback = () => setError(null);
 
   const handleSubmit = async () => {
     resetFeedback();
 
-    if (!siapeValido) {
-      setError('Informe sua matrícula SIAPE.');
+    if (!emailValido) {
+      setError('Informe um e-mail válido.');
       return;
     }
-    if (!pinValido) {
-      setError('A senha deve conter exatamente 4 números.');
+    if (!senhaValida) {
+      setError('A senha deve conter exatamente 6 números.');
       return;
     }
 
@@ -37,8 +37,8 @@ export default function AuthScreen() {
         setError('Informe seu nome completo.');
         return;
       }
-      if (pin !== pinConfirm) {
-        setError('Os dois PINs digitados são diferentes.');
+      if (senha !== senhaConfirm) {
+        setError('As duas senhas digitadas são diferentes.');
         return;
       }
     }
@@ -46,9 +46,9 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       if (mode === 'criar') {
-        await signUp(nome.trim(), siape.trim(), pin);
+        await signUp(nome.trim(), email.trim(), senha);
       } else {
-        await signIn(siape.trim(), pin);
+        await signIn(email.trim(), senha);
       }
       // Sucesso: o useAuth detecta a sessão automaticamente via
       // onAuthStateChange, não é necessário navegar manualmente aqui.
@@ -93,26 +93,26 @@ export default function AuthScreen() {
               </Field>
             )}
 
-            <Field label="Matrícula SIAPE">
+            <Field label="E-mail">
               <input
                 className="input"
-                value={siape}
-                onChange={(e) => setSiape(e.target.value.replace(/\s/g, ''))}
-                placeholder="Ex: 1234567"
-                inputMode="numeric"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value.trim())}
+                placeholder="seu.email@exemplo.com"
                 autoComplete="username"
               />
             </Field>
 
-            <Field label={mode === 'criar' ? 'Crie uma senha de 4 dígitos' : 'Senha (4 dígitos)'}>
+            <Field label={mode === 'criar' ? 'Crie uma senha de 6 dígitos' : 'Senha (6 dígitos)'}>
               <input
-                className="input tracking-[0.5em] text-center"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="••••"
+                className="input tracking-[0.4em] text-center"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
                 inputMode="numeric"
                 type="password"
-                maxLength={4}
+                maxLength={6}
                 autoComplete={mode === 'criar' ? 'new-password' : 'current-password'}
               />
             </Field>
@@ -120,13 +120,13 @@ export default function AuthScreen() {
             {mode === 'criar' && (
               <Field label="Confirme a senha">
                 <input
-                  className="input tracking-[0.5em] text-center"
-                  value={pinConfirm}
-                  onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="••••"
+                  className="input tracking-[0.4em] text-center"
+                  value={senhaConfirm}
+                  onChange={(e) => setSenhaConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••••"
                   inputMode="numeric"
                   type="password"
-                  maxLength={4}
+                  maxLength={6}
                   autoComplete="new-password"
                 />
               </Field>
@@ -134,7 +134,7 @@ export default function AuthScreen() {
 
             {mode === 'criar' && (
               <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-                A senha deve conter exatamente 4 números, para um acesso rápido e seguro. Use algo
+                A senha deve conter exatamente 6 números, para um acesso rápido e seguro. Use algo
                 fácil de lembrar, mas que só você saiba.
               </p>
             )}
@@ -161,9 +161,10 @@ export default function AuthScreen() {
 
 function traduzErro(message?: string): string {
   if (!message) return 'Não foi possível concluir. Tente novamente.';
-  if (message.includes('Invalid login credentials')) return 'SIAPE ou senha incorretos.';
-  if (message.includes('User already registered')) return 'Já existe uma conta com esta matrícula SIAPE.';
-  if (message.includes('Password should be at least')) return 'Senha inválida — use exatamente 4 números.';
+  if (message.includes('Invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (message.includes('User already registered')) return 'Já existe uma conta com este e-mail.';
+  if (message.includes('Password should be at least')) return 'Senha inválida — use exatamente 6 números.';
+  if (message.includes('Unable to validate email address')) return 'E-mail inválido.';
   return message;
 }
 

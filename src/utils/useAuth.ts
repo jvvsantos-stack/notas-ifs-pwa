@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabaseClient';
-import { formatSiapeToEmail, formatPinToPassword } from '../services/auth';
 import type { ProfileRow } from '../types/database';
 
 export interface AuthState {
@@ -45,22 +44,28 @@ export function useAuth() {
     return () => listener.subscription.unsubscribe();
   }, [loadProfile]);
 
-  const signUp = useCallback(async (nome: string, siape: string, pin: string) => {
+  /**
+   * Cadastro com e-mail real e senha de 6 dígitos numéricos, enviados
+   * diretamente ao Supabase Auth (sem composição sintética). O nome
+   * completo vai em `options.data`, de onde o trigger `handle_new_user`
+   * (ver migration 04) copia para a tabela `profiles`.
+   */
+  const signUp = useCallback(async (nome: string, email: string, senha: string) => {
     const { data, error } = await supabase.auth.signUp({
-      email: formatSiapeToEmail(siape),
-      password: formatPinToPassword(siape, pin),
+      email,
+      password: senha,
       options: {
-        data: { nome, siape },
+        data: { nome },
       },
     });
     if (error) throw error;
     return data;
   }, []);
 
-  const signIn = useCallback(async (siape: string, pin: string) => {
+  const signIn = useCallback(async (email: string, senha: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: formatSiapeToEmail(siape),
-      password: formatPinToPassword(siape, pin),
+      email,
+      password: senha,
     });
     if (error) throw error;
     return data;
