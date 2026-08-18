@@ -121,6 +121,7 @@ src/
     ProfileMenu.tsx           # menu de perfil do professor (nome/e-mail + logout)
   pages/
     AuthScreen.tsx            # login e criação de conta (e-mail + senha de 6 dígitos)
+    useAuth.ts                # sessão, login, cadastro (e-mail + senha)
     Dashboard.tsx             # listagem de turmas
     ClassGrades.tsx           # grid de lançamento de notas
     ClassStudents.tsx         # gestão de alunos e divisão de subturmas
@@ -132,7 +133,6 @@ src/
     useGradeAutosave.ts       # autosave por célula (debounce 800ms)
     useSpreadsheetNavigation.ts # navegação por teclado tipo planilha
     useInstallPrompt.ts       # captura do evento beforeinstallprompt
-    useAuth.ts                # sessão, login, cadastro (e-mail + senha)
     supabaseClient.ts
   types/
     database.ts               # tipos espelhando o schema SQL

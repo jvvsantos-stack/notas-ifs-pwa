@@ -4,7 +4,7 @@ import ClassGrades from './pages/ClassGrades';
 import ClassStudents from './pages/ClassStudents';
 import AuthScreen from './pages/AuthScreen';
 import ClassCreationWizard from './components/ClassCreationWizard';
-import { useAuth } from './utils/useAuth';
+import { useAuth } from './pages/useAuth';
 import { useInstallPrompt } from './utils/useInstallPrompt';
 
 type View =
