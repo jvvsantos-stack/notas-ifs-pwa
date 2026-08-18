@@ -1,8 +1,6 @@
-```typescript
 import { useState, useEffect } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
-// Ajuste o caminho abaixo se o seu arquivo do Supabase estiver em outro diretório
-import { supabase } from '../lib/supabase'; 
+import { supabase } from '../lib/supabase';
 
 export function useAuth() {
   const [user, setUser] = useState<User null |>(null);
