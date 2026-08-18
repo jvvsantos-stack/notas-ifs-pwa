@@ -89,7 +89,7 @@ export default function ClassCreationWizard() {
   }, []);
 
   const onDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<HTMLLabelElement>) => {
       e.preventDefault();
       const file = e.dataTransfer.files?.[0];
       if (file) handleFile(file);
@@ -340,16 +340,33 @@ function StepUpload({
   parsing: boolean;
   parseError: string | null;
   parsed: ParsedClassData | null;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLLabelElement>) => void;
   onFileInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onContinue: () => void;
 }) {
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
   return (
     <div className="flex flex-col gap-4">
       <label
-        onDrop={onDrop}
-        onDragOver={(e) => e.preventDefault()}
-        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-white px-6 py-10 text-center transition hover:border-emerald-500 hover:bg-emerald-50/40"
+        onDrop={(e: React.DragEvent<HTMLLabelElement>) => {
+          setIsDraggingOver(false);
+          onDrop(e);
+        }}
+        onDragOver={(e: React.DragEvent<HTMLLabelElement>) => {
+          e.preventDefault();
+          setIsDraggingOver(true);
+        }}
+        onDragLeave={(e: React.DragEvent<HTMLLabelElement>) => {
+          e.preventDefault();
+          setIsDraggingOver(false);
+        }}
+        className={[
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition',
+          isDraggingOver
+            ? 'border-emerald-500 bg-emerald-50/40'
+            : 'border-stone-300 bg-white hover:border-emerald-500 hover:bg-emerald-50/40',
+        ].join(' ')}
       >
         <input type="file" accept="application/pdf" className="hidden" onChange={onFileInput} />
         <div className="text-3xl">📄</div>
