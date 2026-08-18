@@ -3,17 +3,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { calcularNotaEtapa, consolidarAluno } from '../utils/gradeCalculations';
 import { formatNota } from '../utils/formatNota';
-import type { ClassRow, GradeRow } from '../types/database';
-
-interface StudentRowData {
-  enrollmentId: string;
-  studentId: string;
-  nome: string;
-  matricula: string;
-  subturmaPratica: string | null;
-  notaProvaFinal: number | null;
-  gradesByEtapa: Map<number, GradeRow>;
-}
+import type { ClassRow } from '../types/database';
+import type { StudentRowData } from '../types';
 
 interface ExportModalProps {
   classData: ClassRow;

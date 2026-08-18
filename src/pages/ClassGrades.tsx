@@ -15,17 +15,7 @@ import {
   type SituacaoFinal,
 } from '../utils/gradeCalculations';
 import type { ClassRow, GradeRow, SubturmaRow, ProfileRow } from '../types/database';
-
-interface StudentRowData {
-  enrollmentId: string;
-  studentId: string;
-  nome: string;
-  matricula: string;
-  subturmaId: string | null;
-  /** Avaliação única, aplicada após o fechamento de todas as etapas. */
-  notaProvaFinal: number | null;
-  gradesByEtapa: Map<number, GradeRow>;
-}
+import type { StudentRowData } from '../types';
 
 interface ClassGradesProps {
   classId: string;
