@@ -7,7 +7,7 @@ import { useSpreadsheetNavigation } from '../utils/useSpreadsheetNavigation';
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import ExportModal from '../components/ExportModal';
 import ProfileMenu from '../components/ProfileMenu';
-import { formatNota } from '../utils/formatNota';
+import { formatNota, parseNota } from '../utils/formatNota';
 import {
   calcularNotaEtapa,
   consolidarAluno,
@@ -449,32 +449,55 @@ function GradeInput({
   handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, row: number, col: number, maxCol: number) => void;
   isMobile: boolean;
 }) {
-  const [localValue, setLocalValue] = useState(value?.toString() ?? '');
+  // Exibe com vírgula quando o campo não está em foco (padrão brasileiro,
+  // ex: "7,5"); ao focar, mostra o valor cru para facilitar a edição.
+  const [localValue, setLocalValue] = useState(formatNota(value, ''));
   const [showQuick, setShowQuick] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
-    setLocalValue(value?.toString() ?? '');
-  }, [value]);
+    if (!focused) setLocalValue(formatNota(value, ''));
+  }, [value, focused]);
 
   const commit = (raw: string) => {
-    const parsed = raw.trim() === '' ? null : Number(raw);
-    onChange(Number.isNaN(parsed as number) ? null : parsed);
+    const parsed = parseNota(raw);
+    // Trava no intervalo válido de nota (0 a 10) — digitar algo fora
+    // disso não é rejeitado silenciosamente, mas também não é salvo
+    // como está: ajustamos para o limite mais próximo.
+    const clamped =
+      parsed === null ? null : Math.min(10, Math.max(0, parsed));
+    onChange(clamped);
+    setLocalValue(formatNota(clamped, ''));
   };
 
   return (
     <div className="relative flex items-center">
       <input
         ref={(el) => registerCell(row, col, el)}
-        type="number"
-        step="0.1"
-        min="0"
-        max="10"
+        type="text"
         inputMode="decimal"
         className="w-16 rounded-md border border-stone-200 px-1.5 py-1 text-center text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 md:w-20 md:px-2 md:py-1.5 md:text-base"
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
-        onFocus={() => isMobile && setShowQuick(true)}
+        onChange={(e) => {
+          // Aceita apenas dígitos, vírgula e ponto durante a digitação —
+          // qualquer outro caractere é ignorado silenciosamente, sem
+          // travar o campo (diferente de type="number", que rejeitaria
+          // a vírgula por completo).
+          const raw = e.target.value;
+          if (/^[0-9]*[.,]?[0-9]*$/.test(raw)) {
+            setLocalValue(raw);
+          }
+        }}
+        onFocus={(e) => {
+          setFocused(true);
+          // Ao focar, troca a vírgula de exibição pelo valor "cru" (com
+          // ponto ou já editável), para não confundir a edição.
+          setLocalValue(value !== null && value !== undefined ? String(value).replace('.', ',') : '');
+          if (isMobile) setShowQuick(true);
+          e.target.select();
+        }}
         onBlur={() => {
+          setFocused(false);
           commit(localValue);
           // pequeno delay para permitir o clique nos botões de atalho antes de sumir
           setTimeout(() => setShowQuick(false), 150);
@@ -496,7 +519,7 @@ function GradeInput({
               }}
               className="rounded-md bg-stone-100 px-2 py-1 text-[11px] font-medium text-stone-600 active:bg-emerald-100"
             >
-              {v.toFixed(1)}
+              {formatNota(v)}
             </button>
           ))}
         </div>
