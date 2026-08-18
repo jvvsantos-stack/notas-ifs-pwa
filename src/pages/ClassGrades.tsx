@@ -6,6 +6,7 @@ import { useSyncManager } from '../utils/useSyncManager';
 import { useSpreadsheetNavigation } from '../utils/useSpreadsheetNavigation';
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import ExportModal from '../components/ExportModal';
+import { formatNota } from '../utils/formatNota';
 import {
   calcularNotaEtapa,
   consolidarAluno,
@@ -270,16 +271,22 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
   return (
     <div className="min-h-screen bg-stone-50 pb-24">
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto w-full max-w-[1800px] px-4 py-3 md:px-8">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <button onClick={onBack} className="text-xs text-stone-400">
-                ← Voltar
+            <div className="flex min-w-0 items-start gap-3">
+              <button
+                onClick={onBack}
+                aria-label="Voltar"
+                className="group -ml-1 flex shrink-0 items-center gap-1 rounded-xl px-2 py-1 text-2xl font-semibold text-stone-500 transition hover:bg-stone-100 hover:text-emerald-700 focus:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <span aria-hidden className="leading-none">←</span>
               </button>
-              <h1 className="mt-1 truncate text-sm font-semibold text-stone-900">
-                {classData.nome_disciplina}
-              </h1>
-              <p className="text-xs text-stone-400">{classData.codigo_turma}</p>
+              <div className="min-w-0">
+                <h1 className="truncate text-sm font-semibold text-stone-900 md:text-base">
+                  {classData.nome_disciplina}
+                </h1>
+                <p className="text-xs text-stone-400 md:text-sm">{classData.codigo_turma}</p>
+              </div>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               <SyncStatusBadge status={syncStatus} pendingCount={pendingCount} />
@@ -305,7 +312,7 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 pt-4">
+      <div className="mx-auto w-full max-w-[1800px] px-4 pt-4 md:px-8">
         {activeTab !== 'consolidado' && (
           <>
             {classData.tem_laboratorio && (
@@ -457,7 +464,7 @@ function GradeInput({
         min="0"
         max="10"
         inputMode="decimal"
-        className="w-16 rounded-md border border-stone-200 px-1.5 py-1 text-center text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+        className="w-16 rounded-md border border-stone-200 px-1.5 py-1 text-center text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 md:w-20 md:px-2 md:py-1.5 md:text-base"
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onFocus={() => isMobile && setShowQuick(true)}
@@ -605,10 +612,10 @@ function TheoryGrid({
               </div>
               <div className="mt-2 flex justify-between rounded-lg bg-stone-50 px-3 py-2 text-xs">
                 <span className="text-stone-400">
-                  Prova Total: <strong className="text-stone-600">{result.provaTotal ?? '—'}</strong>
+                  Prova Total: <strong className="text-stone-600">{formatNota(result.provaTotal)}</strong>
                 </span>
                 <span className="text-stone-400">
-                  c/ Recp.: <strong className="text-emerald-700">{result.provaComRecp ?? '—'}</strong>
+                  c/ Recp.: <strong className="text-emerald-700">{formatNota(result.provaComRecp)}</strong>
                 </span>
               </div>
             </div>
@@ -620,17 +627,17 @@ function TheoryGrid({
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
-      <table className="w-full min-w-[720px] text-xs">
+      <table className="w-full min-w-[720px] text-xs md:text-sm">
         <thead>
           <tr className="border-b border-stone-100 bg-stone-50 text-stone-400">
-            <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium">Aluno</th>
+            <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium md:px-4 md:py-3 md:text-base">Aluno</th>
             {trKeys.map((k) => (
-              <th key={k} className="px-2 py-2 font-medium">{k}</th>
+              <th key={k} className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">{k}</th>
             ))}
-            <th className="px-2 py-2 font-medium">Prova</th>
-            <th className="px-2 py-2 font-medium">Prova Recp.</th>
-            <th className="px-2 py-2 font-medium">Prova Total</th>
-            <th className="px-2 py-2 font-medium">Prova c/ Recp.</th>
+            <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Prova</th>
+            <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Prova Recp.</th>
+            <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Prova Total</th>
+            <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Prova c/ Recp.</th>
           </tr>
         </thead>
         <tbody>
@@ -653,9 +660,9 @@ function TheoryGrid({
 
             return (
               <tr key={s.enrollmentId} className="border-b border-stone-50 last:border-0">
-                <td className="sticky left-0 z-10 bg-white px-3 py-1.5 font-medium text-stone-700">{s.nome}</td>
+                <td className="sticky left-0 z-10 bg-white px-3 py-1.5 md:px-4 md:py-3 font-medium text-stone-700 md:text-base">{s.nome}</td>
                 {trKeys.map((k, col) => (
-                  <td key={k} className="px-2 py-1.5 text-center">
+                  <td key={k} className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                     <GradeInput
                       value={grade.tr_notas[k]}
                       status={statusByKey[`${s.enrollmentId}-${etapa}-${k}`]}
@@ -671,7 +678,7 @@ function TheoryGrid({
                     />
                   </td>
                 ))}
-                <td className="px-2 py-1.5 text-center">
+                <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                   <GradeInput
                     value={grade.nota_prova}
                     status={statusByKey[`${s.enrollmentId}-${etapa}-prova`]}
@@ -686,7 +693,7 @@ function TheoryGrid({
                     }
                   />
                 </td>
-                <td className="px-2 py-1.5 text-center">
+                <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                   <GradeInput
                     value={grade.nota_prova_recp}
                     status={statusByKey[`${s.enrollmentId}-${etapa}-provarecp`]}
@@ -707,8 +714,8 @@ function TheoryGrid({
                     }
                   />
                 </td>
-                <td className="px-2 py-1.5 text-center font-medium text-stone-600">{result.provaTotal ?? '—'}</td>
-                <td className="px-2 py-1.5 text-center font-semibold text-emerald-700">{result.provaComRecp ?? '—'}</td>
+                <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-medium text-stone-600">{formatNota(result.provaTotal)}</td>
+                <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-semibold text-emerald-700">{formatNota(result.provaComRecp)}</td>
               </tr>
             );
           })}
@@ -844,10 +851,10 @@ function LabGrid({
               </div>
               <div className="mt-2 flex justify-between rounded-lg bg-stone-50 px-3 py-2 text-xs">
                 <span className="text-stone-400">
-                  Média: <strong className="text-stone-600">{result.mediaLab !== null ? result.mediaLab.toFixed(1) : '—'}</strong>
+                  Média: <strong className="text-stone-600">{formatNota(result.mediaLab)}</strong>
                 </span>
                 <span className="text-stone-400">
-                  c/ Recp.: <strong className="text-emerald-700">{result.labComRecp ?? '—'}</strong>
+                  c/ Recp.: <strong className="text-emerald-700">{formatNota(result.labComRecp)}</strong>
                 </span>
               </div>
             </div>
@@ -862,16 +869,16 @@ function LabGrid({
       {filterBar}
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <table className="w-full min-w-[640px] text-xs">
+        <table className="w-full min-w-[640px] text-xs md:text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50 text-stone-400">
-              <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium">Aluno</th>
+              <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium md:px-4 md:py-3 md:text-base">Aluno</th>
               {labKeys.map((k) => (
-                <th key={k} className="px-2 py-2 font-medium">{k}</th>
+                <th key={k} className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">{k}</th>
               ))}
-              <th className="px-2 py-2 font-medium">Média Práticas</th>
-              <th className="px-2 py-2 font-medium">Lab Recp.</th>
-              <th className="px-2 py-2 font-medium">Lab c/ Recp.</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Média Práticas</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Lab Recp.</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Lab c/ Recp.</th>
             </tr>
           </thead>
           <tbody>
@@ -894,9 +901,9 @@ function LabGrid({
 
               return (
                 <tr key={s.enrollmentId} className="border-b border-stone-50 last:border-0">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 font-medium text-stone-700">{s.nome}</td>
+                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 md:px-4 md:py-3 font-medium text-stone-700 md:text-base">{s.nome}</td>
                   {labKeys.map((k, col) => (
-                    <td key={k} className="px-2 py-1.5 text-center">
+                    <td key={k} className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                       <GradeInput
                         value={grade.notas_praticas_lab[k]}
                         status={statusByKey[`${s.enrollmentId}-${etapa}-${k}`]}
@@ -919,10 +926,10 @@ function LabGrid({
                       />
                     </td>
                   ))}
-                  <td className="px-2 py-1.5 text-center font-medium text-stone-600">
-                    {result.mediaLab !== null ? result.mediaLab.toFixed(1) : '—'}
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-medium text-stone-600">
+                    {formatNota(result.mediaLab)}
                   </td>
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                     <GradeInput
                       value={grade.nota_lab_recp}
                       status={statusByKey[`${s.enrollmentId}-${etapa}-labrecp`]}
@@ -943,7 +950,7 @@ function LabGrid({
                       }
                     />
                   </td>
-                  <td className="px-2 py-1.5 text-center font-semibold text-emerald-700">{result.labComRecp ?? '—'}</td>
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-semibold text-emerald-700">{formatNota(result.labComRecp)}</td>
                 </tr>
               );
             })}
@@ -981,18 +988,18 @@ function ConsolidatedView({
       </p>
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <table className="w-full min-w-[720px] text-xs">
+        <table className="w-full min-w-[720px] text-xs md:text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50 text-stone-400">
-              <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium">Aluno</th>
+              <th className="sticky left-0 z-10 bg-stone-50 px-3 py-2 text-left font-medium md:px-4 md:py-3 md:text-base">Aluno</th>
               {etapas.map((e) => (
-                <th key={e} className="px-2 py-2 font-medium">Etapa {e}</th>
+                <th key={e} className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Etapa {e}</th>
               ))}
-              <th className="px-2 py-2 font-medium">Prova Final</th>
-              <th className="px-2 py-2 font-medium">Média Parcial</th>
-              <th className="px-2 py-2 font-medium">Situação Parcial</th>
-              <th className="px-2 py-2 font-medium">Média Final</th>
-              <th className="px-2 py-2 font-medium">Situação Final</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Prova Final</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Média Parcial</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Situação Parcial</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Média Final</th>
+              <th className="px-2 py-2 md:px-4 md:py-3 font-medium md:text-base">Situação Final</th>
             </tr>
           </thead>
           <tbody>
@@ -1024,13 +1031,13 @@ function ConsolidatedView({
 
               return (
                 <tr key={s.enrollmentId} className="border-b border-stone-50 last:border-0">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 font-medium text-stone-700">{s.nome}</td>
+                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 md:px-4 md:py-3 font-medium text-stone-700 md:text-base">{s.nome}</td>
                   {notasEtapas.map((n, i) => (
-                    <td key={i} className="px-2 py-1.5 text-center text-stone-600">
-                      {n !== null ? n.toFixed(1) : '—'}
+                    <td key={i} className="px-2 py-1.5 md:px-4 md:py-3 text-center text-stone-600">
+                      {formatNota(n)}
                     </td>
                   ))}
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                     {podeLancarProvaFinal ? (
                       <GradeInput
                         value={s.notaProvaFinal}
@@ -1047,16 +1054,16 @@ function ConsolidatedView({
                       <span className="text-stone-300">—</span>
                     )}
                   </td>
-                  <td className="px-2 py-1.5 text-center font-medium text-stone-700">
-                    {consolidacao.mediaParcial !== null ? consolidacao.mediaParcial.toFixed(2) : '—'}
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-medium text-stone-700">
+                    {formatNota(consolidacao.mediaParcial)}
                   </td>
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                     <SituacaoBadge situacao={consolidacao.situacaoParcial} />
                   </td>
-                  <td className="px-2 py-1.5 text-center font-medium text-stone-700">
-                    {consolidacao.mediaFinal !== null ? consolidacao.mediaFinal.toFixed(2) : '—'}
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center font-medium text-stone-700">
+                    {formatNota(consolidacao.mediaFinal)}
                   </td>
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-2 py-1.5 md:px-4 md:py-3 text-center">
                     <SituacaoBadge situacao={consolidacao.situacaoFinal} />
                   </td>
                 </tr>
@@ -1070,11 +1077,12 @@ function ConsolidatedView({
 }
 
 function SituacaoBadge({ situacao }: { situacao: SituacaoParcial | SituacaoFinal }) {
+  // Paleta pedida: Cursando = verde, Aprovado = azul, Reprovado/Recuperação = vermelho.
   const toneMap: Record<string, string> = {
-    APROVADO: 'bg-emerald-50 text-emerald-700',
-    REPROVADO: 'bg-red-50 text-red-700',
-    'RECUPERAÇÃO': 'bg-amber-50 text-amber-700',
-    CURSANDO: 'bg-stone-100 text-stone-500',
+    CURSANDO: 'bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-sm shadow-emerald-100',
+    APROVADO: 'bg-blue-50 text-blue-700 border border-blue-300 shadow-sm shadow-blue-100',
+    'RECUPERAÇÃO': 'bg-red-50 text-red-700 border border-red-300 shadow-sm shadow-red-100',
+    REPROVADO: 'bg-red-50 text-red-700 border border-red-300 shadow-sm shadow-red-100',
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${toneMap[situacao]}`}>{situacao}</span>

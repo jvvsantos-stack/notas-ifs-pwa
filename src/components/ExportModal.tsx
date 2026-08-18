@@ -2,6 +2,7 @@ import { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { calcularNotaEtapa, consolidarAluno } from '../utils/gradeCalculations';
+import { formatNota } from '../utils/formatNota';
 import type { ClassRow, GradeRow } from '../types/database';
 
 interface StudentRowData {
@@ -68,7 +69,7 @@ function buildConsolidatedData(
 }
 
 function fmt(n: number | null): string {
-  return n !== null ? n.toFixed(2) : '';
+  return formatNota(n, '');
 }
 
 // ============================================================

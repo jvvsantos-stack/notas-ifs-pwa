@@ -36,6 +36,7 @@ VITE_SUPABASE_ANON_KEY=SUA_CHAVE_ANON
 No **SQL Editor** do painel do Supabase, execute, nesta ordem, o conteúdo de:
 1. `supabase/migrations/01_initial_schema.sql`
 2. `supabase/migrations/02_move_prova_final_to_enrollment.sql` — **só necessário se você já tinha rodado uma versão anterior de `01_initial_schema.sql`** (antes da correção que moveu `nota_prova_final` para `class_enrollments`). Em uma instalação nova, `01` já cria o schema correto e este segundo arquivo pode ser ignorado.
+3. `supabase/migrations/03_add_archived_to_classes.sql` — **idem, só necessário em bancos já existentes** sem a coluna `archived` (usada para arquivar turmas). Em uma instalação nova, `01` já cria essa coluna.
 
 As tabelas nascem com RLS **permissivo** (`USING (true)`), pensado para desenvolvimento. Antes de ir para produção, veja a seção [Segurança / RLS](#segurança--rls-antes-de-ir-para-produção) abaixo.
 
@@ -54,11 +55,11 @@ Os arquivos ficam em `dist/`. Para testar o PWA (Service Worker só funciona em 
 npm run build && npx vite preview
 ```
 
-## Ícones do PWA — ação necessária
+## Ícones do PWA
 
-Os arquivos em `public/icons/*.png` incluídos neste projeto são **placeholders sólidos** (verde institucional, sem logotipo), gerados apenas para o manifest não quebrar a instalabilidade. Substitua-os por ícones reais antes de publicar:
-- `icon-192.png`, `icon-512.png` — ícone padrão (qualquer fundo).
-- `icon-maskable-192.png`, `icon-maskable-512.png` — versão "maskable" (conteúdo importante dentro de uma área de segurança circular central, já que o sistema operacional pode recortar as bordas). Veja [maskable.app](https://maskable.app/editor) para gerar e testar.
+Os arquivos em `public/icons/*.png` e `public/favicon.svg` contêm o ícone oficial do app: fundo verde institucional (`#059669`) com cantos arredondados e a palavra "Notas" centralizada em branco. As versões "maskable" (`icon-maskable-*.png`) usam fundo sem cantos arredondados e texto um pouco menor, dentro da área de segurança central — necessário porque o sistema operacional pode recortar as bordas em formas variadas (círculo, squircle, etc.). Veja [maskable.app](https://maskable.app/editor) se quiser testar como ficam recortados em diferentes formas de ícone.
+
+Se quiser trocar o design no futuro, o gerador está em `public/icons/` — regenere os 4 PNGs mantendo os mesmos nomes de arquivo (`icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`) e o `manifest.json`/`vite.config.ts` continuam funcionando sem alteração.
 
 ## Segurança / RLS antes de ir para produção
 
@@ -68,6 +69,13 @@ Antes de expor o app para professores reais:
 1. Configure o Supabase Auth (e-mail/senha, magic link, ou provedor OAuth).
 2. No arquivo `01_initial_schema.sql`, há um bloco comentado com as políticas reais baseadas em `auth.uid()`. Rode esses `drop policy` / `create policy` no SQL Editor para substituir as políticas permissivas.
 3. Ao criar uma turma (`ClassCreationWizard`), o campo `professor_id` já é preenchido com `supabase.auth.getUser()` — nenhuma mudança de código é necessária, só a troca das policies no banco.
+
+## Gerenciamento de turmas
+
+No menu ⋮ de cada card, no Dashboard:
+- **Editar** — altera nome da disciplina, pesos de prova/laboratório e a quantidade de TRs/práticas por etapa. Reduzir a quantidade de TRs ou práticas de uma etapa que já tem notas lançadas **não apaga** as notas já digitadas (elas continuam salvas no banco), apenas deixa de exibi-las na grade — se você aumentar o número de volta, elas reaparecem.
+- **Arquivar / Desarquivar** — marca a turma como arquivada (`classes.archived = true`), sem apagar nada. Turmas arquivadas saem da aba "Turmas Ativas" e aparecem em "Turmas Arquivadas", de onde também podem ser excluídas.
+- **Apagar** — remoção **permanente e irreversível** do banco (`DELETE`, não soft-delete). Por causa do `ON DELETE CASCADE` no schema, apagar uma turma também apaga automaticamente todas as matrículas (`class_enrollments`) e notas (`grades`) associadas a ela — os alunos em si (`students`) não são apagados, pois podem estar matriculados em outras turmas. A confirmação exige digitar "APAGAR" no modal antes do botão ficar ativo.
 
 ## Funcionamento offline
 
@@ -86,6 +94,11 @@ Antes de expor o app para professores reais:
 src/
   components/
     ClassCreationWizard.tsx   # wizard de importação de turma via PDF
+    ClassCreatedModal.tsx     # modal de confirmação pós-cadastro
+    ClassCardMenu.tsx         # menu ⋮ de ações do card (editar/arquivar/apagar)
+    EditClassModal.tsx        # modal de edição de turma
+    DeleteClassModal.tsx      # modal de confirmação de exclusão
+    Modal.tsx                 # dialog overlay genérico, base dos modais acima
     ExportModal.tsx           # exportação CSV/PDF
     SyncStatusBadge.tsx       # indicador online/offline/syncing
   pages/
@@ -106,6 +119,7 @@ supabase/
   migrations/
     01_initial_schema.sql
     02_move_prova_final_to_enrollment.sql
+    03_add_archived_to_classes.sql
 ```
 
 ## Deploy (Vercel ou Netlify)
@@ -138,11 +152,9 @@ Após o deploy (ou em `npm run build && npx vite preview` local), rode a auditor
 - Meta viewport e `theme-color` no `index.html`.
 
 Pontos que dependem de você:
-- Trocar os ícones placeholder por ícones reais (ver seção acima) — o Lighthouse verifica a presença dos arquivos, mas a qualidade visual é sua responsabilidade.
 - Rodar em HTTPS real (deploy) — o teste local em `localhost` é aceito pelo Lighthouse como equivalente a HTTPS, mas vale confirmar em produção.
 
 ## Limitações conhecidas
 
 - O cache offline cobre a tela de lançamento de notas e a listagem de turmas. O Wizard de criação de turma (importação de PDF) **requer conexão** para salvar a turma nova — não foi projetado para funcionar offline, já que a criação de turma é uma operação pontual, tipicamente feita no início do período.
 - A tela de "Gerenciar Alunos/Subturmas" (botão no Dashboard) ainda não foi implementada — fora do escopo dos prompts executados até aqui.
-- Os ícones do manifest são placeholders (ver seção dedicada acima).

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { parseIfsClassPdf, type ParsedClassData, type ParsedStudent } from '../utils/pdfParser';
 import type { Modalidade } from '../types/database';
+import { formatNota } from '../utils/formatNota';
 
 type WizardStep = 1 | 2 | 3;
 
@@ -48,7 +49,12 @@ function buildInitialForm(parsed: ParsedClassData): ClassFormState {
   };
 }
 
-export default function ClassCreationWizard() {
+interface ClassCreationWizardProps {
+  /** Chamado assim que a turma é salva com sucesso no Supabase. */
+  onSuccess: (createdClass: { id: string; nome_disciplina: string; codigo_turma: string }) => void;
+}
+
+export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardProps) {
   const [step, setStep] = useState<WizardStep>(1);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -59,7 +65,6 @@ export default function ClassCreationWizard() {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // ---------- Passo 1: Upload + Parse ----------
 
@@ -220,7 +225,11 @@ export default function ClassCreationWizard() {
       const { error: gradesErr } = await supabase.from('grades').insert(gradesPayload);
       if (gradesErr) throw gradesErr;
 
-      setSaveSuccess(true);
+      onSuccess({
+        id: classRow.id,
+        nome_disciplina: classRow.nome_disciplina,
+        codigo_turma: classRow.codigo_turma,
+      });
     } catch (err: any) {
       setSaveError(err?.message ?? 'Erro ao salvar a turma. Tente novamente.');
       console.error(err);
@@ -268,7 +277,6 @@ export default function ClassCreationWizard() {
             studentCount={activeStudents.length}
             saving={saving}
             saveError={saveError}
-            saveSuccess={saveSuccess}
             onBack={() => setStep(2)}
             onSave={handleSave}
           />
@@ -543,6 +551,7 @@ function StepForm({
                   className="input"
                   value={form.pesoProva}
                   onChange={(e) => updateForm('pesoProva', Number(e.target.value))}
+                  onBlur={(e) => updateForm('pesoProva', Number(Number(e.target.value).toFixed(1)))}
                 />
               </Field>
               <Field label="Peso do Laboratório">
@@ -552,6 +561,7 @@ function StepForm({
                   className="input"
                   value={form.pesoLab}
                   onChange={(e) => updateForm('pesoLab', Number(e.target.value))}
+                  onBlur={(e) => updateForm('pesoLab', Number(Number(e.target.value).toFixed(1)))}
                 />
               </Field>
             </div>
@@ -652,7 +662,6 @@ function StepConfirm({
   studentCount,
   saving,
   saveError,
-  saveSuccess,
   onBack,
   onSave,
 }: {
@@ -660,22 +669,9 @@ function StepConfirm({
   studentCount: number;
   saving: boolean;
   saveError: string | null;
-  saveSuccess: boolean;
   onBack: () => void;
   onSave: () => void;
 }) {
-  if (saveSuccess) {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center">
-        <div className="text-3xl">✅</div>
-        <h2 className="text-sm font-semibold text-emerald-800">Turma cadastrada com sucesso</h2>
-        <p className="text-xs text-emerald-700">
-          {form.nomeDisciplina} — {studentCount} alunos vinculados.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -689,7 +685,7 @@ function StepConfirm({
           <PreviewRow label="TRs por etapa" value={form.qtdTrPorEtapa.join(' / ')} />
           <PreviewRow
             label="Laboratório"
-            value={form.temLaboratorio ? `Sim (peso ${form.pesoProva}/${form.pesoLab})` : 'Não'}
+            value={form.temLaboratorio ? `Sim (peso ${formatNota(form.pesoProva)}/${formatNota(form.pesoLab)})` : 'Não'}
           />
           <PreviewRow label="Alunos" value={String(studentCount)} />
         </dl>

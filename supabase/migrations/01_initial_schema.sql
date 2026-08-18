@@ -24,6 +24,7 @@ create table public.classes (
   peso_lab numeric(4,2) not null default 4.0,
   qtd_tr_por_etapa jsonb not null default '[]'::jsonb,
   qtd_praticas_por_etapa jsonb not null default '[]'::jsonb,
+  archived boolean not null default false,
   created_at timestamptz not null default now()
 );
 

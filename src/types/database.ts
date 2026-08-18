@@ -16,6 +16,7 @@ export interface ClassRow {
   peso_lab: number;
   qtd_tr_por_etapa: number[];
   qtd_praticas_por_etapa: number[];
+  archived: boolean;
   created_at: string;
 }
 

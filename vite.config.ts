@@ -10,7 +10,7 @@ export default defineConfig({
       // O manifest também existe como arquivo estático em public/manifest.json
       // (conforme solicitado), mas o plugin gera e injeta o seu próprio a
       // partir da config abaixo — mantenha os dois em sincronia se editar.
-      includeAssets: ['favicon.ico', 'icons/icon-192.png', 'icons/icon-512.png'],
+      includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: 'Acompanhamento de Turmas - IFS Eletrônica',
         short_name: 'Notas IFS',

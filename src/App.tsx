@@ -10,8 +10,15 @@ type View =
   | { name: 'grades'; classId: string }
   | { name: 'students'; classId: string };
 
+interface CreatedClassInfo {
+  id: string;
+  nome_disciplina: string;
+  codigo_turma: string;
+}
+
 export default function App() {
   const [view, setView] = useState<View>({ name: 'dashboard' });
+  const [justCreated, setJustCreated] = useState<CreatedClassInfo | null>(null);
   const { canInstall, promptInstall } = useInstallPrompt();
   const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
 
@@ -41,7 +48,12 @@ export default function App() {
     return (
       <>
         {installBanner}
-        <ClassCreationWizard />
+        <ClassCreationWizard
+          onSuccess={(createdClass) => {
+            setJustCreated(createdClass);
+            setView({ name: 'dashboard' });
+          }}
+        />
       </>
     );
   }
@@ -79,6 +91,8 @@ export default function App() {
         onOpenWizard={() => setView({ name: 'wizard' })}
         onOpenGrades={(classId) => setView({ name: 'grades', classId })}
         onOpenStudents={(classId) => setView({ name: 'students', classId })}
+        justCreated={justCreated}
+        onDismissJustCreated={() => setJustCreated(null)}
       />
     </>
   );
