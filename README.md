@@ -37,16 +37,21 @@ No **SQL Editor** do painel do Supabase, execute, nesta ordem, o conteúdo de:
 1. `supabase/migrations/01_initial_schema.sql`
 2. `supabase/migrations/02_move_prova_final_to_enrollment.sql` — **só necessário se você já tinha rodado uma versão anterior de `01_initial_schema.sql`** (antes da correção que moveu `nota_prova_final` para `class_enrollments`). Em uma instalação nova, `01` já cria o schema correto e este segundo arquivo pode ser ignorado.
 3. `supabase/migrations/03_add_archived_to_classes.sql` — **idem, só necessário em bancos já existentes** sem a coluna `archived` (usada para arquivar turmas). Em uma instalação nova, `01` já cria essa coluna.
+4. `supabase/migrations/04_auth_profiles_and_ownership.sql` — **sempre necessário**, mesmo em instalação nova. Cria a tabela `profiles`, o trigger que a popula automaticamente a partir do cadastro (`auth.users`), e substitui as policies permissivas de `01` pelas policies reais baseadas em `auth.uid()`.
+5. `supabase/migrations/05_subturmas.sql` — **só necessário se você já tinha rodado uma versão anterior de `01_initial_schema.sql`** (antes do modelo de subturmas nomeadas). Em uma instalação nova, `01` já cria a tabela `subturmas` e a coluna `subturma_id`.
 
-As tabelas nascem com RLS **permissivo** (`USING (true)`), pensado para desenvolvimento. Antes de ir para produção, veja a seção [Segurança / RLS](#segurança--rls-antes-de-ir-para-produção) abaixo.
+### 5. Configurar autenticação no painel do Supabase
+Em **Authentication → Providers → Email**:
+- Deixe a confirmação de e-mail **desativada** (`Confirm email` = off). Os professores usam um e-mail sintético gerado internamente (`{siape}@ifs.local`), que não existe de verdade e não pode receber e-mails de confirmação.
+- O campo de comprimento mínimo de senha do Supabase **não pode ser reduzido abaixo de 6 caracteres** — isso é uma limitação da plataforma, não do app (veja [Sobre o PIN de 4 dígitos](#sobre-o-pin-de-4-dígitos) abaixo para entender como isso foi contornado). Deixe o mínimo padrão (6) ou superior.
 
-### 5. Rodar em desenvolvimento
+### 6. Rodar em desenvolvimento
 ```bash
 npm run dev
 ```
 Acesse `http://localhost:5173`.
 
-### 6. Build de produção
+### 7. Build de produção
 ```bash
 npm run build
 ```
@@ -61,14 +66,17 @@ Os arquivos em `public/icons/*.png` e `public/favicon.svg` contêm o ícone ofic
 
 Se quiser trocar o design no futuro, o gerador está em `public/icons/` — regenere os 4 PNGs mantendo os mesmos nomes de arquivo (`icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`) e o `manifest.json`/`vite.config.ts` continuam funcionando sem alteração.
 
-## Segurança / RLS antes de ir para produção
+## Autenticação (SIAPE + PIN de 4 dígitos)
 
-O schema inicial cria políticas de RLS **permissivas** (`dev_allow_all_*`) para acelerar o desenvolvimento — qualquer usuário autenticado (ou até anônimo, dependendo da sua config de Auth) pode ler/escrever qualquer linha.
+Cada professor cria uma conta com **nome completo, matrícula SIAPE e um PIN de 4 dígitos numéricos**. A sessão usa o Supabase Auth real (não uma tabela customizada de senhas) — o Supabase cuida do hash da senha (bcrypt), rate-limiting contra força bruta, emissão de JWT e refresh automático de sessão. A tela de auth (`AuthScreen.tsx`) tem abas "Entrar" e "Criar Conta"; a sessão persiste em `localStorage` (via `persistSession: true`, configurado em `supabaseClient.ts`), então o professor continua logado ao fechar e reabrir o app.
 
-Antes de expor o app para professores reais:
-1. Configure o Supabase Auth (e-mail/senha, magic link, ou provedor OAuth).
-2. No arquivo `01_initial_schema.sql`, há um bloco comentado com as políticas reais baseadas em `auth.uid()`. Rode esses `drop policy` / `create policy` no SQL Editor para substituir as políticas permissivas.
-3. Ao criar uma turma (`ClassCreationWizard`), o campo `professor_id` já é preenchido com `supabase.auth.getUser()` — nenhuma mudança de código é necessária, só a troca das policies no banco.
+Cada turma criada é automaticamente vinculada ao professor autenticado (`classes.professor_id`), e o RLS (Row Level Security) do banco garante — no nível do banco, não só na UI — que cada professor só enxerga suas próprias turmas, matrículas e notas. Alunos (`students`) continuam compartilhados entre professores por matrícula, já que um mesmo aluno pode estar em turmas de professores diferentes.
+
+### Sobre o PIN de 4 dígitos
+
+O Supabase Auth exige senhas com **no mínimo 6 caracteres** — esse limite é fixo na plataforma e não pode ser reduzido para 4, mesmo configurando o painel manualmente. Como o PIN de 4 dígitos era um requisito explícito (rapidez de digitação para uso em sala de aula), a solução foi: **a senha real enviada ao Supabase Auth é composta como `${siape}-${pin}`** (ex: SIAPE `1234567` + PIN `4821` vira a senha `"1234567-4821"`), montada de forma determinística no frontend (`useAuth.ts`, função `buildPassword`). O professor nunca vê nem digita essa string composta — apenas o PIN de 4 dígitos, exatamente como pedido. No login, a mesma composição é refeita a partir do SIAPE e do PIN digitados, então funciona de forma transparente.
+
+Isso não reduz a segurança percebida pelo usuário (o PIN continua sendo o único segredo que ele guarda), mas tecnicamente contorna uma restrição da plataforma sem inventar um sistema de autenticação próprio por fora do Supabase Auth.
 
 ## Gerenciamento de turmas
 
@@ -76,6 +84,16 @@ No menu ⋮ de cada card, no Dashboard:
 - **Editar** — altera nome da disciplina, pesos de prova/laboratório e a quantidade de TRs/práticas por etapa. Reduzir a quantidade de TRs ou práticas de uma etapa que já tem notas lançadas **não apaga** as notas já digitadas (elas continuam salvas no banco), apenas deixa de exibi-las na grade — se você aumentar o número de volta, elas reaparecem.
 - **Arquivar / Desarquivar** — marca a turma como arquivada (`classes.archived = true`), sem apagar nada. Turmas arquivadas saem da aba "Turmas Ativas" e aparecem em "Turmas Arquivadas", de onde também podem ser excluídas.
 - **Apagar** — remoção **permanente e irreversível** do banco (`DELETE`, não soft-delete). Por causa do `ON DELETE CASCADE` no schema, apagar uma turma também apaga automaticamente todas as matrículas (`class_enrollments`) e notas (`grades`) associadas a ela — os alunos em si (`students`) não são apagados, pois podem estar matriculados em outras turmas. A confirmação exige digitar "APAGAR" no modal antes do botão ficar ativo.
+
+## Divisão em subturmas
+
+Na tela "Alunos / Subturmas" de cada turma (`ClassStudents.tsx`), o botão **"+ Dividir Turma"** abre um modal com duas formas de criar subturmas:
+- **Por quantidade** — escolha 2, 3 ou 4 subturmas; são criadas automaticamente como "Subturma A", "Subturma B", etc.
+- **Nomes personalizados** — digite um nome por linha (ex: "Laboratório 1", "Laboratório 2") para nomear as subturmas livremente.
+
+Depois de criadas, a tela mostra uma coluna por subturma (mais uma coluna "Sem subturma") com os alunos já agrupados. Cada aluno tem um seletor (`<select>`) ao lado do nome para movê-lo entre subturmas ou tirá-lo de qualquer uma — a mudança é salva imediatamente no Supabase (`class_enrollments.subturma_id`).
+
+Na tela de Lançamento de Notas, a aba "Práticas / Laboratório" usa essas mesmas subturmas para filtrar a grade (útil quando cada subturma faz a prática em um horário ou turno diferente).
 
 ## Funcionamento offline
 
@@ -101,9 +119,12 @@ src/
     Modal.tsx                 # dialog overlay genérico, base dos modais acima
     ExportModal.tsx           # exportação CSV/PDF
     SyncStatusBadge.tsx       # indicador online/offline/syncing
+    ProfileMenu.tsx           # menu de perfil do professor (nome/SIAPE + logout)
   pages/
+    AuthScreen.tsx            # login e criação de conta (SIAPE + PIN)
     Dashboard.tsx             # listagem de turmas
     ClassGrades.tsx           # grid de lançamento de notas
+    ClassStudents.tsx         # gestão de alunos e divisão de subturmas
   utils/
     gradeCalculations.ts      # engine de cálculo de notas (funções puras)
     pdfParser.ts              # parser do PDF de diário do IFS
@@ -112,6 +133,7 @@ src/
     useGradeAutosave.ts       # autosave por célula (debounce 800ms)
     useSpreadsheetNavigation.ts # navegação por teclado tipo planilha
     useInstallPrompt.ts       # captura do evento beforeinstallprompt
+    useAuth.ts                # sessão, login, cadastro (SIAPE + PIN)
     supabaseClient.ts
   types/
     database.ts               # tipos espelhando o schema SQL
@@ -120,6 +142,8 @@ supabase/
     01_initial_schema.sql
     02_move_prova_final_to_enrollment.sql
     03_add_archived_to_classes.sql
+    04_auth_profiles_and_ownership.sql
+    05_subturmas.sql
 ```
 
 ## Deploy (Vercel ou Netlify)

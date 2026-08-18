@@ -20,6 +20,20 @@ export interface ClassRow {
   created_at: string;
 }
 
+export interface ProfileRow {
+  id: string;
+  nome: string;
+  siape: string;
+  created_at: string;
+}
+
+export interface SubturmaRow {
+  id: string;
+  class_id: string;
+  nome: string;
+  created_at: string;
+}
+
 export interface StudentRow {
   id: string;
   matricula: string;
@@ -31,7 +45,7 @@ export interface ClassEnrollmentRow {
   id: string;
   class_id: string;
   student_id: string;
-  subturma_pratica: string | null;
+  subturma_id: string | null;
   /** Avaliação única, aplicada após o fechamento de todas as etapas. */
   nota_prova_final: number | null;
   created_at: string;

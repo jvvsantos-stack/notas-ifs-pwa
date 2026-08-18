@@ -6,8 +6,9 @@ import ClassCardMenu from '../components/ClassCardMenu';
 import ClassCreatedModal from '../components/ClassCreatedModal';
 import EditClassModal from '../components/EditClassModal';
 import DeleteClassModal from '../components/DeleteClassModal';
+import ProfileMenu from '../components/ProfileMenu';
 import { db } from '../utils/localDb';
-import type { ClassRow } from '../types/database';
+import type { ClassRow, ProfileRow } from '../types/database';
 
 interface ClassWithStats extends ClassRow {
   totalAlunos: number;
@@ -21,6 +22,8 @@ interface DashboardProps {
   onOpenStudents: (classId: string) => void;
   justCreated: { id: string; nome_disciplina: string; codigo_turma: string } | null;
   onDismissJustCreated: () => void;
+  profile: ProfileRow;
+  onLogout: () => void;
 }
 
 type ArchiveFilter = 'ativas' | 'arquivadas';
@@ -31,6 +34,8 @@ export default function Dashboard({
   onOpenStudents,
   justCreated,
   onDismissJustCreated,
+  profile,
+  onLogout,
 }: DashboardProps) {
   const [classes, setClasses] = useState<ClassWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +185,7 @@ export default function Dashboard({
             >
               + Nova turma
             </button>
+            <ProfileMenu profile={profile} onLogout={onLogout} />
           </div>
         </div>
       </header>

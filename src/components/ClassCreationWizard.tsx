@@ -7,7 +7,6 @@ import { formatNota } from '../utils/formatNota';
 type WizardStep = 1 | 2 | 3;
 
 interface EditableStudent extends ParsedStudent {
-  subturma: '' | 'Turma 1' | 'Turma 2';
   removido: boolean;
 }
 
@@ -52,13 +51,16 @@ function buildInitialForm(parsed: ParsedClassData): ClassFormState {
 interface ClassCreationWizardProps {
   /** Chamado assim que a turma é salva com sucesso no Supabase. */
   onSuccess: (createdClass: { id: string; nome_disciplina: string; codigo_turma: string }) => void;
+  /** Chamado quando o professor confirma o cancelamento do cadastro. */
+  onCancel: () => void;
 }
 
-export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardProps) {
+export default function ClassCreationWizard({ onSuccess, onCancel }: ClassCreationWizardProps) {
   const [step, setStep] = useState<WizardStep>(1);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedClassData | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const [form, setForm] = useState<ClassFormState | null>(null);
   const [students, setStudents] = useState<EditableStudent[]>([]);
@@ -83,7 +85,7 @@ export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardPr
       setParsed(result);
       setForm(buildInitialForm(result));
       setStudents(
-        result.alunos.map((a) => ({ ...a, subturma: '', removido: false }))
+        result.alunos.map((a) => ({ ...a, removido: false }))
       );
     } catch (err) {
       setParseError('Falha ao processar o PDF. Verifique se é um diário do IFS válido.');
@@ -202,7 +204,7 @@ export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardPr
       const enrollmentsPayload = activeStudents.map((s) => ({
         class_id: classRow.id,
         student_id: studentIdByMatricula.get(s.matricula),
-        subturma_pratica: form.temLaboratorio && s.subturma ? s.subturma : null,
+        subturma_id: null,
       }));
 
       const { data: enrollments, error: enrollErr } = await supabase
@@ -242,7 +244,7 @@ export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardPr
 
   return (
     <div className="min-h-screen bg-stone-50 pb-24">
-      <WizardHeader step={step} />
+      <WizardHeader step={step} onCancelClick={() => setShowCancelConfirm(true)} />
 
       <div className="mx-auto max-w-xl px-4 pt-4">
         {step === 1 && (
@@ -282,6 +284,37 @@ export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardPr
           />
         )}
       </div>
+
+      {showCancelConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowCancelConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-base font-semibold text-stone-900">Cancelar cadastro?</h2>
+            <p className="mb-4 text-sm text-stone-500">
+              As informações digitadas serão perdidas.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 rounded-xl border border-stone-300 bg-white py-2.5 text-sm font-medium text-stone-600"
+              >
+                Continuar editando
+              </button>
+              <button
+                onClick={onCancel}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white active:bg-red-700"
+              >
+                Cancelar cadastro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -290,12 +323,20 @@ export default function ClassCreationWizard({ onSuccess }: ClassCreationWizardPr
 // Header com progresso
 // ============================================================
 
-function WizardHeader({ step }: { step: WizardStep }) {
+function WizardHeader({ step, onCancelClick }: { step: WizardStep; onCancelClick: () => void }) {
   const labels = ['Upload', 'Configurar', 'Salvar'];
   return (
     <header className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/95 backdrop-blur">
       <div className="mx-auto max-w-xl px-4 py-3">
-        <h1 className="text-sm font-semibold tracking-wide text-stone-500">NOVA TURMA</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-sm font-semibold tracking-wide text-stone-500">NOVA TURMA</h1>
+          <button
+            onClick={onCancelClick}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+          >
+            Cancelar Cadastro
+          </button>
+        </div>
         <div className="mt-2 flex items-center gap-2">
           {labels.map((label, i) => {
             const idx = (i + 1) as WizardStep;
@@ -570,6 +611,9 @@ function StepForm({
       </Section>
 
       <Section title={`Alunos reconhecidos (${activeCount})`}>
+        <p className="-mt-1 mb-1 text-[11px] text-stone-400">
+          A divisão em subturmas é feita depois do cadastro, na tela "Alunos / Subturmas" da turma.
+        </p>
         <div className="flex flex-col divide-y divide-stone-100">
           {students.map((s) => (
             <div key={s.matricula} className={s.removido ? 'py-2 opacity-40' : 'py-2'}>
@@ -583,25 +627,6 @@ function StepForm({
                     onChange={(e) => updateStudent(s.matricula, { nome: e.target.value })}
                   />
                   <p className="mt-0.5 text-xs text-stone-400">{s.matricula}</p>
-
-                  {form.temLaboratorio && !s.removido && (
-                    <div className="mt-1.5 flex gap-1.5">
-                      {(['Turma 1', 'Turma 2'] as const).map((sub) => (
-                        <button
-                          key={sub}
-                          onClick={() => updateStudent(s.matricula, { subturma: sub })}
-                          className={[
-                            'rounded-full px-2.5 py-1 text-xs font-medium',
-                            s.subturma === sub
-                              ? 'bg-emerald-700 text-white'
-                              : 'bg-stone-100 text-stone-500',
-                          ].join(' ')}
-                        >
-                          {sub}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <button
                   onClick={() => updateStudent(s.matricula, { removido: !s.removido })}

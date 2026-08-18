@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import ClassGrades from './pages/ClassGrades';
+import ClassStudents from './pages/ClassStudents';
+import AuthScreen from './pages/AuthScreen';
 import ClassCreationWizard from './components/ClassCreationWizard';
+import { useAuth } from './utils/useAuth';
 import { useInstallPrompt } from './utils/useInstallPrompt';
 
 type View =
@@ -17,10 +20,23 @@ interface CreatedClassInfo {
 }
 
 export default function App() {
+  const { loading: authLoading, profile, signOut } = useAuth();
   const [view, setView] = useState<View>({ name: 'dashboard' });
   const [justCreated, setJustCreated] = useState<CreatedClassInfo | null>(null);
   const { canInstall, promptInstall } = useInstallPrompt();
   const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return <AuthScreen />;
+  }
 
   const installBanner =
     canInstall && !installBannerDismissed ? (
@@ -53,6 +69,7 @@ export default function App() {
             setJustCreated(createdClass);
             setView({ name: 'dashboard' });
           }}
+          onCancel={() => setView({ name: 'dashboard' })}
         />
       </>
     );
@@ -62,24 +79,21 @@ export default function App() {
     return (
       <>
         {installBanner}
-        <ClassGrades classId={view.classId} onBack={() => setView({ name: 'dashboard' })} />
+        <ClassGrades
+          classId={view.classId}
+          onBack={() => setView({ name: 'dashboard' })}
+          profile={profile}
+          onLogout={signOut}
+        />
       </>
     );
   }
 
-  // TODO: tela de gerenciamento de alunos/subturmas (fora do escopo deste prompt)
   if (view.name === 'students') {
     return (
       <>
         {installBanner}
-        <div className="p-4">
-          <button onClick={() => setView({ name: 'dashboard' })} className="text-xs text-stone-400">
-            ← Voltar
-          </button>
-          <p className="mt-2 text-sm text-stone-600">
-            Gerenciamento de alunos/subturmas — a implementar.
-          </p>
-        </div>
+        <ClassStudents classId={view.classId} onBack={() => setView({ name: 'dashboard' })} />
       </>
     );
   }
@@ -93,6 +107,8 @@ export default function App() {
         onOpenStudents={(classId) => setView({ name: 'students', classId })}
         justCreated={justCreated}
         onDismissJustCreated={() => setJustCreated(null)}
+        profile={profile}
+        onLogout={signOut}
       />
     </>
   );

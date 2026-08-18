@@ -6,6 +6,7 @@ import { useSyncManager } from '../utils/useSyncManager';
 import { useSpreadsheetNavigation } from '../utils/useSpreadsheetNavigation';
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import ExportModal from '../components/ExportModal';
+import ProfileMenu from '../components/ProfileMenu';
 import { formatNota } from '../utils/formatNota';
 import {
   calcularNotaEtapa,
@@ -13,14 +14,14 @@ import {
   type SituacaoParcial,
   type SituacaoFinal,
 } from '../utils/gradeCalculations';
-import type { ClassRow, GradeRow } from '../types/database';
+import type { ClassRow, GradeRow, SubturmaRow, ProfileRow } from '../types/database';
 
 interface StudentRowData {
   enrollmentId: string;
   studentId: string;
   nome: string;
   matricula: string;
-  subturmaPratica: string | null;
+  subturmaId: string | null;
   /** Avaliação única, aplicada após o fechamento de todas as etapas. */
   notaProvaFinal: number | null;
   gradesByEtapa: Map<number, GradeRow>;
@@ -29,15 +30,18 @@ interface StudentRowData {
 interface ClassGradesProps {
   classId: string;
   onBack: () => void;
+  profile: ProfileRow;
+  onLogout: () => void;
 }
 
-type SubturmaFilter = 'Todas' | 'Turma 1' | 'Turma 2';
+type SubturmaFilter = 'Todas' | string; // 'Todas' ou o id de uma subturma
 
 const QUICK_VALUES = [0, 5, 10];
 
-export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
+export default function ClassGrades({ classId, onBack, profile, onLogout }: ClassGradesProps) {
   const [classData, setClassData] = useState<ClassRow | null>(null);
   const [students, setStudents] = useState<StudentRowData[]>([]);
+  const [subturmas, setSubturmas] = useState<SubturmaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -78,10 +82,18 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
 
         const { data: enrollData, error: enrollErr } = await supabase
           .from('class_enrollments')
-          .select('id, student_id, subturma_pratica, nota_prova_final, students(nome, matricula)')
+          .select('id, student_id, subturma_id, nota_prova_final, students(nome, matricula)')
           .eq('class_id', classId);
         if (enrollErr) throw enrollErr;
         enrollments = enrollData ?? [];
+
+        const { data: subturmasData, error: subturmasErr } = await supabase
+          .from('subturmas')
+          .select('*')
+          .eq('class_id', classId)
+          .order('nome');
+        if (subturmasErr) throw subturmasErr;
+        setSubturmas(subturmasData ?? []);
 
         const enrollmentIds = enrollments.map((e) => e.id);
         if (enrollmentIds.length > 0) {
@@ -100,7 +112,7 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
             id: e.id,
             class_id: classId,
             student_id: e.student_id,
-            subturma_pratica: e.subturma_pratica,
+            subturma_id: e.subturma_id,
             nota_prova_final: e.nota_prova_final,
             created_at: '',
           }))
@@ -144,7 +156,7 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
         studentId: e.student_id,
         nome: e.students?.nome ?? '(sem nome)',
         matricula: e.students?.matricula ?? '',
-        subturmaPratica: e.subturma_pratica,
+        subturmaId: e.subturma_id,
         notaProvaFinal: e.nota_prova_final,
         gradesByEtapa: gradesByEnrollment.get(e.id) ?? new Map(),
       }));
@@ -245,7 +257,7 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
 
   const visibleStudents = useMemo(() => {
     if (subturmaFilter === 'Todas') return students;
-    return students.filter((s) => s.subturmaPratica === subturmaFilter);
+    return students.filter((s) => s.subturmaId === subturmaFilter);
   }, [students, subturmaFilter]);
 
   if (loading) {
@@ -288,14 +300,17 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
                 <p className="text-xs text-stone-400 md:text-sm">{classData.codigo_turma}</p>
               </div>
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <SyncStatusBadge status={syncStatus} pendingCount={pendingCount} />
-              <button
-                onClick={() => setExportOpen(true)}
-                className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600 active:bg-stone-50"
-              >
-                Exportar
-              </button>
+            <div className="flex shrink-0 items-start gap-2">
+              <div className="flex flex-col items-end gap-1.5">
+                <SyncStatusBadge status={syncStatus} pendingCount={pendingCount} />
+                <button
+                  onClick={() => setExportOpen(true)}
+                  className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600 active:bg-stone-50"
+                >
+                  Exportar
+                </button>
+              </div>
+              <ProfileMenu profile={profile} onLogout={onLogout} />
             </div>
           </div>
 
@@ -341,6 +356,7 @@ export default function ClassGrades({ classId, onBack }: ClassGradesProps) {
                 classData={classData}
                 etapa={activeTab}
                 students={students}
+                subturmas={subturmas}
                 subturmaFilter={subturmaFilter}
                 setSubturmaFilter={setSubturmaFilter}
                 statusByKey={statusByKey}
@@ -742,6 +758,7 @@ function LabGrid({
   classData,
   etapa,
   students,
+  subturmas,
   subturmaFilter,
   setSubturmaFilter,
   statusByKey,
@@ -752,6 +769,7 @@ function LabGrid({
   classData: ClassRow;
   etapa: number;
   students: StudentRowData[];
+  subturmas: SubturmaRow[];
   subturmaFilter: SubturmaFilter;
   setSubturmaFilter: (f: SubturmaFilter) => void;
   statusByKey: Record<string, CellSaveStatus>;
@@ -773,13 +791,16 @@ function LabGrid({
   const { registerCell, handleKeyDown } = useSpreadsheetNavigation();
 
   const filtered =
-    subturmaFilter === 'Todas' ? students : students.filter((s) => s.subturmaPratica === subturmaFilter);
+    subturmaFilter === 'Todas' ? students : students.filter((s) => s.subturmaId === subturmaFilter);
 
   const filterBar = (
-    <div className="mb-3 flex gap-1.5">
-      {(['Todas', 'Turma 1', 'Turma 2'] as SubturmaFilter[]).map((f) => (
-        <TabButton small key={f} active={subturmaFilter === f} onClick={() => setSubturmaFilter(f)}>
-          {f}
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      <TabButton small active={subturmaFilter === 'Todas'} onClick={() => setSubturmaFilter('Todas')}>
+        Todas
+      </TabButton>
+      {subturmas.map((sub) => (
+        <TabButton small key={sub.id} active={subturmaFilter === sub.id} onClick={() => setSubturmaFilter(sub.id)}>
+          {sub.nome}
         </TabButton>
       ))}
     </div>

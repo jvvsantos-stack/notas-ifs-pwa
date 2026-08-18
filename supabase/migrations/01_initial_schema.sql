@@ -32,7 +32,21 @@ comment on column public.classes.qtd_tr_por_etapa is 'Array de inteiros, ex: [3,
 comment on column public.classes.qtd_praticas_por_etapa is 'Array de inteiros, ex: [3,6]';
 
 -- ============================================================
--- 2. students (Alunos)
+-- 2. subturmas (Divisão da turma em grupos nomeados livremente,
+--    ex: "Subturma A", "Laboratório 1")
+-- ============================================================
+create table public.subturmas (
+  id uuid primary key default gen_random_uuid(),
+  class_id uuid not null references public.classes(id) on delete cascade,
+  nome text not null,
+  created_at timestamptz not null default now(),
+  unique (class_id, nome)
+);
+
+create index idx_subturmas_class_id on public.subturmas(class_id);
+
+-- ============================================================
+-- 3. students (Alunos)
 -- ============================================================
 create table public.students (
   id uuid primary key default gen_random_uuid(),
@@ -42,13 +56,13 @@ create table public.students (
 );
 
 -- ============================================================
--- 3. class_enrollments (Matrículas de Alunos na Turma)
+-- 4. class_enrollments (Matrículas de Alunos na Turma)
 -- ============================================================
 create table public.class_enrollments (
   id uuid primary key default gen_random_uuid(),
   class_id uuid not null references public.classes(id) on delete cascade,
   student_id uuid not null references public.students(id) on delete cascade,
-  subturma_pratica text,
+  subturma_id uuid references public.subturmas(id) on delete set null,
   nota_prova_final numeric(4,2),
   created_at timestamptz not null default now(),
   unique (class_id, student_id)
@@ -56,9 +70,10 @@ create table public.class_enrollments (
 
 create index idx_class_enrollments_class_id on public.class_enrollments(class_id);
 create index idx_class_enrollments_student_id on public.class_enrollments(student_id);
+create index idx_class_enrollments_subturma_id on public.class_enrollments(subturma_id);
 
 -- ============================================================
--- 4. grades (Notas e Avaliações)
+-- 5. grades (Notas e Avaliações)
 -- ============================================================
 create table public.grades (
   id uuid primary key default gen_random_uuid(),
@@ -79,14 +94,22 @@ create index idx_grades_enrollment_id on public.grades(enrollment_id);
 -- TODO: restringir por auth.uid() quando o login estiver ativo
 --   (trocar USING (true) por USING (professor_id = auth.uid()),
 --   e nas tabelas filhas fazer o join até classes.professor_id)
+--
+-- Rode a migration 04_auth_profiles_and_ownership.sql depois desta
+-- para substituir estas policies pelas reais baseadas em auth.uid()
+-- (ela já faz o `drop policy` + `create policy` automaticamente).
 -- ============================================================
 
 alter table public.classes enable row level security;
+alter table public.subturmas enable row level security;
 alter table public.students enable row level security;
 alter table public.class_enrollments enable row level security;
 alter table public.grades enable row level security;
 
 create policy "dev_allow_all_classes" on public.classes
+  for all using (true) with check (true);
+
+create policy "dev_allow_all_subturmas" on public.subturmas
   for all using (true) with check (true);
 
 create policy "dev_allow_all_students" on public.students
@@ -99,38 +122,8 @@ create policy "dev_allow_all_grades" on public.grades
   for all using (true) with check (true);
 
 -- ============================================================
--- Policies reais (comentadas — ativar quando Auth estiver pronto)
+-- Policies reais: veja 04_auth_profiles_and_ownership.sql — essa
+-- migration substitui automaticamente as policies acima (dev_allow_all_*)
+-- pelas versões reais baseadas em auth.uid(), assim que a autenticação
+-- estiver configurada.
 -- ============================================================
-
--- drop policy "dev_allow_all_classes" on public.classes;
--- create policy "classes_owner" on public.classes
---   for all using (professor_id = auth.uid()) with check (professor_id = auth.uid());
-
--- drop policy "dev_allow_all_class_enrollments" on public.class_enrollments;
--- create policy "class_enrollments_owner" on public.class_enrollments
---   for all using (
---     exists (select 1 from public.classes c where c.id = class_id and c.professor_id = auth.uid())
---   ) with check (
---     exists (select 1 from public.classes c where c.id = class_id and c.professor_id = auth.uid())
---   );
-
--- drop policy "dev_allow_all_grades" on public.grades;
--- create policy "grades_owner" on public.grades
---   for all using (
---     exists (
---       select 1 from public.class_enrollments ce
---       join public.classes c on c.id = ce.class_id
---       where ce.id = enrollment_id and c.professor_id = auth.uid()
---     )
---   ) with check (
---     exists (
---       select 1 from public.class_enrollments ce
---       join public.classes c on c.id = ce.class_id
---       where ce.id = enrollment_id and c.professor_id = auth.uid()
---     )
---   );
-
--- students é compartilhado entre professores (mesma matrícula pode estar
--- em turmas de professores diferentes) — manter leitura ampla mesmo com Auth:
--- create policy "students_read_all" on public.students for select using (true);
--- create policy "students_write_auth" on public.students for insert with check (auth.uid() is not null);
