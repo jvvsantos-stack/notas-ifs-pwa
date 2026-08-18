@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import type { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import type { ProfileRow } from '../types/database';
 
@@ -55,7 +56,7 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         setState((prev) => ({ ...prev, loading: true }));
         loadProfile(session.user.id);
